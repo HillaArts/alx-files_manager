@@ -20,6 +20,8 @@ class UsersController {
             return res.status(400).json({ error: 'Already exist' });
         }
 
+    
+
         const hashedPassword = sha1(password);
         const newUser = {
             email,
