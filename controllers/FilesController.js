@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import mime from 'mime-types';
-import sha1 from 'sha1';
+import { ObjectId } from 'mongodb';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
@@ -61,6 +61,48 @@ class FilesController {
         await filesCollection.insertOne(newFile);
 
         return res.status(201).json(newFile);
+    }
+
+    static async getShow(req, res) {
+        const token = req.headers['x-token'];
+        const userId = await redisClient.get(`auth_${token}`);
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const fileId = req.params.id;
+        const filesCollection = dbClient.db.collection('files');
+        const file = await filesCollection.findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
+
+        if (!file) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+
+        return res.json(file);
+    }
+
+    static async getIndex(req, res) {
+        const token = req.headers['x-token'];
+        const userId = await redisClient.get(`auth_${token}`);
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const parentId = req.query.parentId || 0;
+        const page = parseInt(req.query.page, 10) || 0;
+        const pageSize = 20;
+
+        const filesCollection = dbClient.db.collection('files');
+        const pipeline = [
+            { $match: { parentId: parentId === '0' ? 0 : new ObjectId(parentId), userId: new ObjectId(userId) } },
+            { $skip: page * pageSize },
+            { $limit: pageSize },
+        ];
+
+        const files = await filesCollection.aggregate(pipeline).toArray();
+        return res.json(files);
     }
 }
 
