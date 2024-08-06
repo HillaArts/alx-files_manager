@@ -1,4 +1,3 @@
-// main.js
 import redisClient from './utils/redis';
 
 (async () => {
