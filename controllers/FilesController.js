@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
-import mime from 'mime-types';
 import { ObjectId } from 'mongodb';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
@@ -103,6 +102,50 @@ class FilesController {
 
         const files = await filesCollection.aggregate(pipeline).toArray();
         return res.json(files);
+    }
+
+    static async putPublish(req, res) {
+        const token = req.headers['x-token'];
+        const userId = await redisClient.get(`auth_${token}`);
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const fileId = req.params.id;
+        const filesCollection = dbClient.db.collection('files');
+        const file = await filesCollection.findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
+
+        if (!file) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+
+        await filesCollection.updateOne({ _id: new ObjectId(fileId) }, { $set: { isPublic: true } });
+        const updatedFile = await filesCollection.findOne({ _id: new ObjectId(fileId) });
+
+        return res.status(200).json(updatedFile);
+    }
+
+    static async putUnpublish(req, res) {
+        const token = req.headers['x-token'];
+        const userId = await redisClient.get(`auth_${token}`);
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const fileId = req.params.id;
+        const filesCollection = dbClient.db.collection('files');
+        const file = await filesCollection.findOne({ _id: new ObjectId(fileId), userId: new ObjectId(userId) });
+
+        if (!file) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+
+        await filesCollection.updateOne({ _id: new ObjectId(fileId) }, { $set: { isPublic: false } });
+        const updatedFile = await filesCollection.findOne({ _id: new ObjectId(fileId) });
+
+        return res.status(200).json(updatedFile);
     }
 }
 
